@@ -81,7 +81,7 @@ def needDownload(file_obj,download_path):
         if (file_obj["size"] != size):
             return True
         else:
-            if (date.now() > file_obj["date"].now()):
+            if (date > file_obj["date"]):
                 return False
             else:
                 return True
