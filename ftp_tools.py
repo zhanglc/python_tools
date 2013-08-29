@@ -5,6 +5,7 @@ from ftplib import FTP
 import os, os.path, time, sys
 from datetime import datetime
 from multiprocessing import Pool
+import csv
 
 
 server_files = []
@@ -43,8 +44,8 @@ def buildObj(name, date, size):
 
 def init_server_file():
     print("get file file name for server", end="")
-    ftp = FTP('ftp address')
-    ftp.login('username', 'password')
+    ftp = FTP('ftp.ingrammicro.com.au')
+    ftp.login('IMGuest_ftpscript', 'FtPIM4fiLE')
     ftp.retrlines('LIST', get_server_file)
     ftp.quit()
 
@@ -55,9 +56,9 @@ def findDownloadFile():
     for srv in server_files:
         find = False
         for loc in local_files:
-            if (loc["size"] == srv["name"]):
+            if (loc["name"] == srv["name"]):
                 find = True
-                if (loc["date"] == srv["size"] ):
+                if (loc["size"] == srv["size"] ):
                     if (loc["date"].now() < srv["date"].now()):
                         download_files.apped(srv["name"])
                         break
@@ -70,23 +71,55 @@ def findDownloadFile():
     local_files = None
     server_files = None
 
-def downloadSingle(name,download_path):
+def needDownload(file_obj,download_path):
+    name = file_obj["name"]
+    if not os.path.exists("%s%s"%(download_path, name)):
+        return True
+    else:
+        date = datetime.fromtimestamp(os.path.getmtime(os.path.join(download_path, name)))
+        size = os.path.getsize(os.path.join(download_path, name))
+        if (file_obj["size"] != size):
+            return True
+        else:
+            if (date.now() > file_obj["date"].now()):
+                return False
+            else:
+                return True
+
+
+def downloadSingle(file_object, download_path):
     # name,download_path = name_download_path
-    ftp = FTP('ftp address')
-    ftp.login('username', 'password')
-    ftp.retrbinary('RETR %s' % name,
-                   open("%s%s"%(download_path,name), 'wb').write);
-    ftp.quit()
-    print("%s is downloaded." % name)
+    name = file_object["name"]
+    try:
+        ftp = FTP('ftp.ingrammicro.com.au')
+        ftp.login('IMGuest_ftpscript', 'FtPIM4fiLE')
+        with open("%s%s" % (download_path, name), 'wb') as f:
+            ftp.retrbinary('RETR %s' % name,
+                           f.write)
+            f.close()
+        ftp.quit()
+        print("%s is downloaded." % name)
+        return name, "success"
+    except Exception:
+        return name, "fail"
+
+
 
 def wrapf(t):
-    return downloadSingle(*t)
+    if (needDownload(*t)):
+        return downloadSingle(*t)
+
 
 def downloadAll():
     print("Downloading....")
-    global download_files,download_path
+    global server_files, download_path
     pool = Pool(2)
-    pool.map(wrapf,[(x,download_path) for x in download_files])
+    res = pool.map(wrapf, [(x, download_path) for x in server_files])
+    with open(download_path+"result.log.csv","wb") as f:
+        resWR = csv.writer(f,delimiter=',')
+        for row in res:
+            resWR.writerow(row)
+        f.close()
     print("Done!")
 
 
@@ -95,17 +128,12 @@ def main():
 
     script, download_path = sys.argv
     if (not download_path.endswith("/")):
-        download_path = download_path+"/"
-    print("download path:"+download_path)
-    init_local_file()
+        download_path = download_path + "/"
+    print("download path:" + download_path)
     init_server_file()
-    findDownloadFile()
     downloadAll()
 
- 
- 
- 
- 
+
 if __name__ == '__main__':
     main()
 
